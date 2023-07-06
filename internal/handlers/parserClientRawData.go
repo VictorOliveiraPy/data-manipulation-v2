@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-func HandleRawClientData(rawMsgChannel chan string, channelClientRaw chan entity.Client, wg *sync.WaitGroup) {
+func HandleRawClientData(rawMsgChannel chan string, channelClientRaw chan entity.ClientRaw, wg *sync.WaitGroup) {
 	for line := range rawMsgChannel {
 		now := time.Now().Format(time.RFC3339)
-		channelClientRaw <- entity.Client{
+		channelClientRaw <- entity.ClientRaw{
 			ID:                 uuid.New(),
 			Document:           getValue(DocumentIndexStart, DocumentIndexEnd, line),
 			Private:            getValue(PrivateIndexStart, PrivateIndexEnd, line),
