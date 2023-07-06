@@ -3,6 +3,7 @@ module github.com/VictorOliveiraPy
 go 1.20
 
 require (
+	github.com/Nhanderu/brdoc v1.1.2
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v5 v5.4.1
 )

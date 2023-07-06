@@ -21,18 +21,43 @@ func main() {
 	}
 
 	rawChannel := make(chan string, handlers.BufferSize)
-	rawCreateChannel := make(chan entity.Client, handlers.BufferSize)
+	rawCreateChannel := make(chan entity.ClientRaw, handlers.BufferSize)
+	parserChannel := make(chan entity.ClientRaw, handlers.BufferSize)
+	parserChannelClient := make(chan entity.Client, handlers.BufferSize)
+	channelUpdateClientRaw := make(chan entity.Client, handlers.BufferSize)
+	handlerRepository := repository.NewClientRawRepository(conn)
+
 	var wg sync.WaitGroup
 
 	go handlers.ReadFileAndSendToChannel("base.txt", rawChannel)
 	wg.Add(1)
-
 	go handlers.HandleRawClientData(rawChannel, rawCreateChannel, &wg)
-	handlerRepository := repository.NewClientRawRepository(conn)
 	wg.Add(1)
-	go handlerRepository.Create(rawCreateChannel, &wg)
+	go handlerRepository.CreateRaw(rawCreateChannel, &wg)
+	hasData := true
 
-	defer wg.Wait()
+	for hasData {
+		wg.Add(1)
+		go handlerRepository.GetClients(10000, "Waiting", parserChannel, &wg)
+		wg.Add(1)
+
+		go handlers.ParseClient(parserChannel, parserChannelClient, &wg)
+		wg.Add(1)
+		go handlerRepository.Create(parserChannelClient, channelUpdateClientRaw, &wg)
+		wg.Add(1)
+		go handlerRepository.UpdateStatusClient(channelUpdateClientRaw, &wg)
+
+		wg.Wait()
+
+		select {
+		case <-parserChannel:
+			fmt.Println("ainda tem dados")
+			hasData = true
+		default:
+			hasData = false
+		}
+	}
+
 	elapsed := time.Since(startTime)
 	fmt.Println("[Done] exited with code=0 in %s", elapsed)
 }
