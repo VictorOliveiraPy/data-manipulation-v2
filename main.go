@@ -8,7 +8,6 @@ import (
 	"github.com/VictorOliveiraPy/internal/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
-	"sync"
 	"time"
 )
 
@@ -20,6 +19,7 @@ func main() {
 		panic(err)
 	}
 
+	quit := make(chan bool)
 	rawChannel := make(chan string, handlers.BufferSize)
 	rawCreateChannel := make(chan entity.ClientRaw, handlers.BufferSize)
 	parserChannel := make(chan entity.ClientRaw, handlers.BufferSize)
@@ -27,37 +27,14 @@ func main() {
 	channelUpdateClientRaw := make(chan entity.Client, handlers.BufferSize)
 	handlerRepository := repository.NewClientRawRepository(conn)
 
-	var wg sync.WaitGroup
-
 	go handlers.ReadFileAndSendToChannel("base.txt", rawChannel)
-	wg.Add(1)
-	go handlers.HandleRawClientData(rawChannel, rawCreateChannel, &wg)
-	wg.Add(1)
-	go handlerRepository.CreateRaw(rawCreateChannel, &wg)
-	hasData := true
-
-	for hasData {
-		wg.Add(1)
-		go handlerRepository.GetClients(10000, "Waiting", parserChannel, &wg)
-		wg.Add(1)
-
-		go handlers.ParseClient(parserChannel, parserChannelClient, &wg)
-		wg.Add(1)
-		go handlerRepository.Create(parserChannelClient, channelUpdateClientRaw, &wg)
-		wg.Add(1)
-		go handlerRepository.UpdateStatusClient(channelUpdateClientRaw, &wg)
-
-		wg.Wait()
-
-		select {
-		case <-parserChannel:
-			fmt.Println("ainda tem dados")
-			hasData = true
-		default:
-			hasData = false
-		}
-	}
-
+	go handlers.HandleRawClientData(rawChannel, rawCreateChannel)
+	go handlerRepository.CreateRaw(rawCreateChannel)
+	go handlerRepository.GetClients(10000, "Waiting", parserChannel)
+	go handlers.ParseClient(parserChannel, parserChannelClient)
+	go handlerRepository.Create(parserChannelClient, channelUpdateClientRaw)
+	go handlerRepository.UpdateStatusClient(channelUpdateClientRaw, quit)
+	<-quit
 	elapsed := time.Since(startTime)
 	fmt.Println("[Done] exited with code=0 in %s", elapsed)
 }

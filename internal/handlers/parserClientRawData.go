@@ -4,11 +4,10 @@ import (
 	"github.com/VictorOliveiraPy/internal/entity"
 	"github.com/google/uuid"
 	"strings"
-	"sync"
 	"time"
 )
 
-func HandleRawClientData(rawMsgChannel chan string, channelClientRaw chan entity.ClientRaw, wg *sync.WaitGroup) {
+func HandleRawClientData(rawMsgChannel chan string, channelClientRaw chan entity.ClientRaw) {
 	for line := range rawMsgChannel {
 		now := time.Now().Format(time.RFC3339)
 		channelClientRaw <- entity.ClientRaw{
@@ -26,7 +25,6 @@ func HandleRawClientData(rawMsgChannel chan string, channelClientRaw chan entity
 			UpdatedAt:          now,
 		}
 	}
-	defer wg.Done()
 	close(channelClientRaw)
 
 }
