@@ -8,6 +8,7 @@ import (
 	"github.com/VictorOliveiraPy/internal/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -19,22 +20,36 @@ func main() {
 		panic(err)
 	}
 
-	quit := make(chan bool)
 	rawChannel := make(chan string, handlers.BufferSize)
 	rawCreateChannel := make(chan entity.ClientRaw, handlers.BufferSize)
 	parserChannel := make(chan entity.ClientRaw, handlers.BufferSize)
 	parserChannelClient := make(chan entity.Client, handlers.BufferSize)
 	channelUpdateClientRaw := make(chan entity.Client, handlers.BufferSize)
+	var wg sync.WaitGroup
+
 	handlerRepository := repository.NewClientRawRepository(conn)
 
 	go handlers.ReadFileAndSendToChannel("base.txt", rawChannel)
-	go handlers.HandleRawClientData(rawChannel, rawCreateChannel)
-	go handlerRepository.CreateRaw(rawCreateChannel)
-	go handlerRepository.GetClients(10000, "Waiting", parserChannel)
-	go handlers.ParseClient(parserChannel, parserChannelClient)
-	go handlerRepository.Create(parserChannelClient, channelUpdateClientRaw)
-	go handlerRepository.UpdateStatusClient(channelUpdateClientRaw, quit)
-	<-quit
+	wg.Add(1)
+
+	go handlers.HandleRawClientData(rawChannel, rawCreateChannel, &wg)
+	wg.Add(1)
+
+	go handlerRepository.CreateRaw(rawCreateChannel, &wg)
+	wg.Add(1)
+
+	go handlerRepository.GetClients(10000, "Waiting", parserChannel, &wg)
+	wg.Add(1)
+
+	go handlers.ParseClient(parserChannel, parserChannelClient, &wg)
+	wg.Add(1)
+
+	go handlerRepository.Create(parserChannelClient, channelUpdateClientRaw, &wg)
+	wg.Add(1)
+
+	go handlerRepository.UpdateStatusClient(channelUpdateClientRaw, &wg)
+
+	defer wg.Wait()
 	elapsed := time.Since(startTime)
 	fmt.Println("[Done] exited with code=0 in %s", elapsed)
 }

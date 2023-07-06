@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/VictorOliveiraPy/internal/entity"
@@ -75,7 +76,8 @@ func PointerToString(value *string) string {
 	return *value
 }
 
-func ParseClient(parserChannel chan entity.ClientRaw, parserChannelClient chan entity.Client) error {
+func ParseClient(parserChannel chan entity.ClientRaw, parserChannelClient chan entity.Client, wg *sync.WaitGroup) error {
+	defer wg.Done()
 	for c := range parserChannel {
 		documentType, err := ParseDocumentValue(c.Document)
 
